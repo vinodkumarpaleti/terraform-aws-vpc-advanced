@@ -69,18 +69,19 @@ resource "aws_subnet" "database" {
 }
 
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.my_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
+    gateway_id = aws_internet_gateway.igw.id
   }
 
   tags = merge(
     var.common_tags,
     {
         Name = "${var.project_name}-public"
-    }
+    },
+    var.public_route_table_tags
   )
 }
 resource "aws_eip" "eip" {
@@ -100,10 +101,10 @@ resource "aws_nat_gateway" "main" {
   )
   # To ensure proper ordering, it is recommended to add an explicit dependency
   # on the Internet Gateway for the VPC.
-  depends_on = [aws_internet_gateway.main]
+  depends_on = [aws_internet_gateway.igw]
 }
 resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.my_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
@@ -113,12 +114,13 @@ resource "aws_route_table" "private" {
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-public"
-    }
+        Name = "${var.project_name}-private"
+    },
+    var.private_route_table_tags
   )
 }
 resource "aws_route_table" "database" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.my_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
@@ -128,7 +130,8 @@ resource "aws_route_table" "database" {
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-public"
-    }
+        Name = "${var.project_name}-database"
+    },
+    var.database_route_table_tags
   )
 }
