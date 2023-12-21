@@ -63,3 +63,6 @@ variable "private_route_table_tags" {
 variable "database_route_table_tags" {
   default = {}
 }
+variable "db_subnet_group_tags" {
+  default = {}
+}
