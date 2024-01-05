@@ -1,23 +1,25 @@
-resource "aws_vpc" "my_vpc" {
-    cidr_block = var.cidr_block
-    enable_dns_hostnames = var.enable_dns_hostnames
-    enable_dns_support = var.enable_dns_support
-  
+resource "aws_vpc" "main" {
+  cidr_block       = var.cidr_block
+  enable_dns_hostnames = var.enable_dns_hostnames
+  enable_dns_support = var.enable_dns_support
+
   tags = merge(
     var.common_tags,
     {
-        Name = var.project_name
+        Name = "${var.project_name}-${var.env}"
     },
     var.vpc_tags
   )
 }
 
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.my_vpc.id
+
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
   tags = merge(
     var.common_tags,
     {
-        Name = var.project_name
+        Name = "${var.project_name}-${var.env}"
     },
     var.igw_tags
   )
@@ -27,72 +29,71 @@ resource "aws_internet_gateway" "igw" {
 resource "aws_subnet" "public" {
   count = length(var.public_subnet_cidr)
   map_public_ip_on_launch = true
-  vpc_id     = aws_vpc.my_vpc.id
+  vpc_id     = aws_vpc.main.id
   cidr_block = var.public_subnet_cidr[count.index]
   availability_zone = local.azs[count.index]
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-public-${local.azs[count.index]}"
-        #Name = "${var.project_name}-${var.env}-public-${local.azs[count.index]}"
+        Name = "${var.project_name}-${var.env}-public-${local.azs[count.index]}"
     }
   )
 }
+
 resource "aws_subnet" "private" {
   count = length(var.private_subnet_cidr)
-  map_public_ip_on_launch = true
-  vpc_id     = aws_vpc.my_vpc.id
+  vpc_id     = aws_vpc.main.id
   cidr_block = var.private_subnet_cidr[count.index]
   availability_zone = local.azs[count.index]
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-private-${local.azs[count.index]}"
-        #Name = "${var.project_name}-${var.env}-public-${local.azs[count.index]}"
+        Name = "${var.project_name}-${var.env}-private-${local.azs[count.index]}"
     }
   )
 }
 
+
 resource "aws_subnet" "database" {
   count = length(var.database_subnet_cidr)
-  map_public_ip_on_launch = true
-  vpc_id     = aws_vpc.my_vpc.id
+  vpc_id     = aws_vpc.main.id
   cidr_block = var.database_subnet_cidr[count.index]
   availability_zone = local.azs[count.index]
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-database-${local.azs[count.index]}"
-        #Name = "${var.project_name}-${var.env}-public-${local.azs[count.index]}"
+        Name = "${var.project_name}-${var.env}-database-${local.azs[count.index]}"
     }
   )
 }
 
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.my_vpc.id
+  vpc_id = aws_vpc.main.id
 
-/*   route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  } */
+  # route {
+  #   cidr_block = "0.0.0.0/0"
+  #   gateway_id = aws_internet_gateway.main.id
+  # }
 
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-public"
-    },
-    var.public_route_table_tags
+        Name = "${var.project_name}-${var.env}-public"
+    }
   )
 }
+
 # always add route seperately
 resource "aws_route" "public" {
   route_table_id            = aws_route_table.public.id
   destination_cidr_block    = "0.0.0.0/0"
-  gateway_id = aws_internet_gateway.igw.id
+  gateway_id = aws_internet_gateway.main.id
 }
+
 resource "aws_eip" "eip" {
   domain   = "vpc"
 }
+
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.eip.id
   subnet_id     = aws_subnet.public[0].id
@@ -100,58 +101,60 @@ resource "aws_nat_gateway" "main" {
   tags = merge(
     var.common_tags,
     {
-        Name = var.project_name
-        #Name = "${var.project_name}-${var.env}"
+        Name = "${var.project_name}-${var.env}"
     },
     var.nat_gateway_tags
   )
   # To ensure proper ordering, it is recommended to add an explicit dependency
   # on the Internet Gateway for the VPC.
-  depends_on = [aws_internet_gateway.igw]
+  depends_on = [aws_internet_gateway.main]
 }
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.my_vpc.id
 
-  /* route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
-  } */
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  # route {
+  #   cidr_block = "0.0.0.0/0"
+  #   nat_gateway_id = aws_nat_gateway.main.id
+  # }
 
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-private"
+        Name = "${var.project_name}-${var.env}-private"
     },
     var.private_route_table_tags
   )
 }
-# always add route seperately
+
 resource "aws_route" "private" {
   route_table_id            = aws_route_table.private.id
   destination_cidr_block    = "0.0.0.0/0"
-  nat_gateway_id = aws_nat_gateway.main.allocation_id
+  nat_gateway_id = aws_nat_gateway.main.id
 }
-resource "aws_route_table" "database" {
-  vpc_id = aws_vpc.my_vpc.id
 
-  /* route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
-  } */
+resource "aws_route_table" "database" {
+  vpc_id = aws_vpc.main.id
+
+  # route {
+  #   cidr_block = "0.0.0.0/0"
+  #   nat_gateway_id = aws_nat_gateway.main.id
+  # }
 
   tags = merge(
     var.common_tags,
     {
-        Name = "${var.project_name}-database"
+        Name = "${var.project_name}-${var.env}-database"
     },
     var.database_route_table_tags
   )
 }
-# always add route seperately
+
 resource "aws_route" "database" {
   route_table_id            = aws_route_table.database.id
   destination_cidr_block    = "0.0.0.0/0"
-  nat_gateway_id = aws_nat_gateway.main.allocation_id
+  nat_gateway_id = aws_nat_gateway.main.id
 }
 
 resource "aws_route_table_association" "public" {
@@ -173,14 +176,15 @@ resource "aws_route_table_association" "database" {
 }
 
 resource "aws_db_subnet_group" "roboshop" {
-  name       = var.project_name
+  name       = "${var.project_name}-${var.env}"
   subnet_ids = aws_subnet.database[*].id
 
   tags = merge(
     var.common_tags,
     {
-        Name = var.project_name
+        Name = "${var.project_name}-${var.env}"
     },
     var.db_subnet_group_tags
   )
 }
+

@@ -2,14 +2,14 @@
 resource "aws_vpc_peering_connection" "peering" {
   count = var.is_peering_required ? 1 : 0
   #peer_owner_id = var.peer_owner_id
-  peer_vpc_id   = aws_vpc.my_vpc.id
+  peer_vpc_id   = aws_vpc.main.id
   #requestor, default VPC is our requestor
   vpc_id        = var.requestor_vpc_id
   auto_accept   = true
 
   tags = merge(
     {
-      Name = "VPC peering between default and ${var.project_name}"
+      Name = "${var.project_name}-${var.env}"
     },
     var.common_tags
   )
